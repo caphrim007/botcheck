@@ -1,0 +1,26 @@
+There's really nothing to install. Just run the python script,
+sit back, and wait.
+
+	python botcheck.py
+
+I have debugging turned on so that you can see what botcheck
+is doing. If you want to disable debugging, open the irclib.py
+file and change DEBUG to 0 at the top of the file.
+
+This version of botcheck does not connect to an arbitrary number
+of IRC servers. Right now it can only connect to 1. The next release
+will likely allow an arbitrary number of servers.
+
+Alerts will be sent through syslog. The messages look like this
+
+If the user was simply on the server
+	BOTCHECK - The system [host] was found on [server] using the nickname [nick]
+
+If the user was on the server and in a channel
+	BOTCHECK - The system [host] was found in the channel [channel] on [server] using the nickname [nick]
+
+If you want to change the syslog message, it's located in the
+botcheck.py file.
+
+Regards,
+-Tim
