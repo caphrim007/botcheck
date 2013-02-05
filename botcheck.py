@@ -1,28 +1,30 @@
-#! /usr/bin/env python
+import syslog
+import botsqlite
+import sys
 
 from ircbot import SingleServerIRCBot
 from irclib import nm_to_n, nm_to_h, irc_lower, ip_numstr_to_quad, ip_quad_to_numstr
-import config
-import sys
-import syslog
-import time
+from time import sleep
 
-class TestBot(SingleServerIRCBot):
+class botcheck(SingleServerIRCBot):
 	def __init__(self, nickname, server, port=6667):
 		SingleServerIRCBot.__init__(self, [(server, port)], nickname, nickname)
-
+		self.sqldb = botsqlite.botsqlite('bot.db')
+			
 		self.connection.add_global_handler("whoreply", self.who_parser)
 
-		self.exempt_from_reporting	= []
 		self.is_connected		= 0
 
-	def on_nicknameinuse(self, c, e):
-		c.nick(c.get_nickname() + "_")
+	def on_nicknameinuse(self, connection, event):
+		connection.nick(connection.get_nickname() + "_")
 
-	def on_ping(self, c, e):
+	def on_ping(self, connection, event):
 		if self.is_connected:
-			time.sleep(3)
-			for to_search in self.who_for_users:
+			sleep(3)
+
+			who_cmds = self.sqldb.get_the_who();
+
+			for to_search in who_cmds:
 				self.connection.who(to_search)
 		else:
 			self.is_connected = 1
@@ -39,34 +41,39 @@ class TestBot(SingleServerIRCBot):
 		"""
 
 		arguments 	= event.arguments()
-		channel		= arguments[0]
-		user		= arguments[1]
-		host		= arguments[2]
-		server		= arguments[3]
-		nick		= arguments[4]
-		other		= arguments[6]
 
-		if self.exempt_from_reporting.count(nick) < 1:
+		channel		= arguments[0].replace("'","").strip()
+		user		= arguments[1].replace("'","").strip()
+		host		= arguments[2].replace("'","").strip()
+		server		= arguments[3].replace("'","").strip()
+		nick		= arguments[4].replace("'","").strip()
+		other		= arguments[6].replace("'","").strip()
+
+		self.sqldb.nick_is_exempt(nick,server)
+
+		if (self.sqldb.nick_is_exempt(nick,server)):
+			pass
+		elif (self.sqldb.nick_is_exempt(nick,"all")):
+			pass
+		else:
 			if channel == "":
+				self.sqldb.add_alert(nick,"no channel",server)
 				syslog_mesg = "BOTCHECK - The system "+host+" was found on "+server+" using the nickname "+nick
 				syslog.syslog(syslog_mesg)
 			else:
+				self.sqldb.add_alert(nick,channel,server)
 				syslog_mesg = "BOTCHECK - The system "+host+" was found in the channel "+channel+" on "+server+" using the nickname "+nick
 				syslog.syslog(syslog_mesg)
 
-def main():
-	for server in config.hosts:
-		if server.count(':') < 1:
-			port = 6667
-		else:
-			(server, port) = server.split(':')
-
-		port = int(port)
-		bot 				= TestBot(config.nickname, server, port)
-		bot.exempt_from_reporting 	= config.exempt_from_reporting
-		bot.who_for_users		= config.who_for_users
-
-		bot.start()
-
-if __name__ == "__main__":
-    main()
+	def on_featurelist(self, connection, event):
+		features 	= event.arguments()
+		has_nicklen	= False
+		is_exempt	= False
+		for feature in features:
+			has_nicklen = feature.lower().find('nicklen')
+			if has_nicklen >= 0:
+				length 		= feature.split('=')[1].strip()
+				new_nick	= connection.get_nickname()[0:9]
+				is_exempt	= self.sqldb.nick_is_exempt(new_nick)
+				if (not is_exempt):
+					self.sqldb.add_exemption(new_nick, "all")

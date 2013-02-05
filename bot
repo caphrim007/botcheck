@@ -1,0 +1,87 @@
+#! /usr/bin/env python
+
+import os, sys, getopt, glob
+import signal
+import createDaemon
+import botcheck
+import botsqlite
+
+from time import sleep, strftime, localtime
+
+# signal handler function
+def handle_sig(signum, frame):
+	"""handle signal"""
+	global sigterm_received, sighup_received, debug_lines
+	debug_lines += [
+		"Signal handler called with signal %s\n" % signum ]
+	if signum == signal.SIGTERM:
+		sigterm_received = True
+	elif signum == signal.SIGHUP:
+		sighup_received = True
+
+daemon	= False
+debug	= False
+server	= None
+port 	= None
+
+# main process, parse command arguments
+try:
+	opts, args = getopt.getopt(sys.argv[1:], '', ["daemon","debug","server=","port="] )
+except getopt.GetoptError, msg:
+	sys.exit(1)
+
+for o, a in opts:
+	if o in ('--daemon'):
+		daemon = True
+	if o in ('--debug'):
+		debug = True
+	if o in ('--server'):
+		server = a
+	if o in ('--port'):
+		port = int(a)
+
+if daemon:
+	# go into daemon mode
+	retCode = createDaemon.createDaemon()
+
+sqldb 		= botsqlite.botsqlite('bot.db')
+nick 		= sqldb.random_nick()
+nick_id		= sqldb.get_nick_id(nick)
+is_exempt 	= sqldb.nick_is_exempt(nick)
+
+if (not is_exempt):
+	sqldb.add_exemption(nick, "all")
+
+debug_lines 	= []
+out_file_name	= 'log/botcheck_%s_%s.out' % (strftime('%m-%d_%H:%M', localtime()),server)
+
+# save our pid for signals
+pid = os.getpid()
+
+# open a log file for stdout and stderr
+log = open(out_file_name, 'w')
+
+if debug:
+	sys.stdout = log
+	sys.stderr = log
+	sys.stdout.flush()
+
+# signal flag
+sigterm_received = False
+sighup_received = False
+
+signal.signal( signal.SIGTERM, handle_sig )
+signal.signal( signal.SIGHUP, handle_sig )
+
+# report file stat results as floats
+os.stat_float_times( True )
+
+if server is None and port is None:
+	print "You must specify both an IRC server and port to connect to"
+	sys.exit(1)
+
+server_id = sqldb.get_server_id(server,port)
+sqldb.add_connection(pid,nick_id,server_id)
+
+bot = botcheck.botcheck(nick, server, port)
+bot.start()

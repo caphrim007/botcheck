@@ -1,0 +1,15 @@
+BEGIN TRANSACTION;
+CREATE TABLE connections(pid, nick_id, server_id, timestamp);
+CREATE TABLE exempt_users(exempt_id integer primary key, nickname, server_id);
+CREATE TABLE servers(server_id integer primary key, host, port, covered);
+CREATE TABLE nicks(nick_id integer primary key, nickname);
+CREATE TABLE convos(id integer primary key, nick_id, server_id, conversation, timestamp);
+CREATE TABLE alerts(id integer primary key, nick_id, server_id, timestamp, name_found, chan_found);
+CREATE TABLE thewho(id integer primary key, who);
+INSERT INTO "servers" VALUES(NULL, 'irc.freenode.net', '6667', '0');
+INSERT INTO "servers" VALUES(NULL, 'us.undernet.org', '6667', '0');
+INSERT INTO "servers" VALUES(NULL, 'irc.dal.net', '6667', '0');
+INSERT INTO "servers" VALUES(NULL, 'irc.prison.net', '6667', '0');
+INSERT INTO "thewho" VALUES(NULL, "*.localhost.localdomain");
+INSERT INTO "thewho" VALUES(NULL, "127.0.*");
+COMMIT;

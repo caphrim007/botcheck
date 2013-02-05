@@ -1,15 +1,18 @@
-There's really nothing to install. Just run the python script,
-sit back, and wait.
+botcheck is an application that reads in data from multiple
+sources to provide alerting to IRC traffic (legit or not)
+that is running over the network
 
-	python botcheck.py
+botcheck controls an army of watching bots that will query
+IRC servers for a list of users in the domains you specify
 
-I have debugging turned on so that you can see what botcheck
-is doing. If you want to disable debugging, open the irclib.py
-file and change DEBUG to 0 at the top of the file.
+botcheck supports an arbitrary number of bots.
+Bots can be added on the fly.
+Bots will re-connect if killed or disconnected.
 
-This version of botcheck does not connect to an arbitrary number
-of IRC servers. Right now it can only connect to 1. The next release
-will likely allow an arbitrary number of servers.
+Bots cannot be controlled from IRC. There is no risk to your
+security program when running this tool. You can only control
+the bots from the botmaster script. Bots will only answer to
+server pings that are necessary to keep them alive on the server.
 
 Alerts will be sent through syslog. The messages look like this
 

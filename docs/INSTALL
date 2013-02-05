@@ -1,0 +1,42 @@
+Unpack the botcheck archive.
+
+In the install.sql file, change the "who" lines. At
+this point in time you cannot add more who commands
+through botmaster.
+
+Load the SQL code into a sqlite database once you've
+made changes to the install.sql file
+
+	sqlite bot.db ".read install.sql"
+
+Change into the main directory and add new IRC servers.
+IRC servers must include a port
+
+	./botmaster add server irc.dal.net:6667
+	./botmaster add server irc.prison.net:6667
+	etc...
+
+Also add nicks to the nick pool
+
+	./botmaster add nick mynick1
+	./botmaster add nick mynick2
+	etc...
+
+One bot will be run on each IRC server. Bot names
+will be reused as needed.
+
+Start your botnet when you're done
+
+	./botmaster start all
+
+Logs of all the IRC traffic are kept in the logs/
+directory.
+
+To stop your botnet, issue the following command
+
+	./botmaster stop all
+
+All bots will die.
+
+Regards,
+-Tim

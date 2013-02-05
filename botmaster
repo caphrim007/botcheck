@@ -1,0 +1,608 @@
+#! /bin/sh
+
+BOTMASTER_START=$1
+NICKNAME=''
+IRC_SERVER=''
+SQLITE_PATH="/usr/bin/sqlite3"
+PYTHON_BIN="/usr/bin/python"
+BOTCHECK_PATH="/home/tarupp/coding/botcheck/"
+BOT_DB="bot.db"
+DEFAULT_IRC_PORT=6667
+
+usage() {
+	# See how we were called
+	case "$1" in
+		add)
+			case "$2" in
+				nick)
+					echo ""
+					echo "You must specify a nickname to add"
+					echo ""
+					echo "examples:"
+					echo ""
+					echo "	botmaster add nick TheBigBot"
+					echo "	botmaster add nick 123Superbot"
+					echo ""
+					;;
+				server)
+					echo ""
+					echo "You must specify an IRC server to connect to"
+					echo ""
+					echo "examples:"
+					echo ""
+					echo "	botmaster add server irc.dal.net 6667"
+					echo "	botmaster add server irc.prison.net 6666"
+					echo "	botmaster add server irc.rizon.net"
+					echo ""
+					echo "If no port is specified, a default port of 6667 is used"
+					echo ""
+					;;
+				exemption)
+					case "$3" in
+						nick)
+							echo ""
+							echo "You must supply a nickname to exempt"
+							echo ""
+							;;
+						server)
+							echo ""
+							echo "You must supply an IRC server to add the exemption on"
+							echo ""
+							;;
+					esac
+
+					echo "examples:"
+					echo ""
+					echo "	botmaster add exemption theuser1 irc.freenode.net"
+					echo "	botmaster add exemption I4mC00l all"
+					echo ""
+					;;
+				*)
+					echo ""
+					echo "Commands for adding items to the bot database"
+					echo ""
+					echo "Available commands are"
+					echo ""
+					echo "	nick		Add a new nickname for a bot"
+					echo "	server		Add a new IRC server to connect to"
+					echo "	exemption	Add a new nickname to exempt from alerting"
+					echo ""
+					;;
+			esac
+			;;
+		clean)
+			echo ""
+			echo "You must specify what to clean"
+			echo ""
+			echo "examples:"
+			echo ""
+			echo "	botmaster clean logs"
+			echo "	botmaster clean pyc"
+			echo "	botmaster clean database"
+			echo ""
+			;;
+		main)
+			echo ""
+			echo "Check for potential bots on IRC networks"
+			echo ""
+			echo "usage: botmaster [commands]"
+			echo ""
+			echo "Available commands are"
+			echo ""
+			echo "	add	Add a new bots and servers"
+			echo "	clean	Clean up botmaster files and database"
+			echo "	remove	Remove bots and server"
+			echo "	report	Report on the current state of bots and checking"
+			echo "	start"	Start bots
+			echo "	stop	Stop bots"
+			echo ""
+			;;
+		remove)
+			case "$2" in
+				nick)
+					;;
+				server)
+					echo ""
+					echo "You must specify a server to remove"
+					echo ""
+					echo "examples:"
+					echo ""
+					echo "botmaster remove server irc.freenode.net"
+					echo "botmaster remove server irc.rizon.net"
+					echo ""
+					;;
+				exemption)
+					echo ""
+					echo "You must specify a nickname to remove from"
+					echo "exemption, and the server to remove it from"
+					echo ""
+					echo "examples:"
+					echo ""
+					echo "botmaster remove exemption all"
+					echo "botmaster remove exemption tim all"
+					echo "botmaster remove exemption tim irc.rizon.net"
+					echo ""
+					;;
+				*)
+					echo ""
+					echo "Commands for removing items from the bot database"
+					echo ""
+					echo "Available commands are"
+					echo ""
+					echo "	nick		Remove a bot nickname"
+					echo "	server		Remove a server"
+					echo "	exemption	Remove an exempted nickname"
+					echo ""
+					;;
+			esac
+			;;
+		start)
+			echo ""
+			echo "You must supply a server you want to "
+			echo "start a bot on, or use the keyword 'all'"
+			echo ""
+			echo "examples:"
+			echo ""
+			echo "botmaster start irc.dal.net"
+			echo "botmaster start all"
+			echo ""
+			;;
+	esac
+
+	exit 1
+}
+
+start_bot() {
+	IRC_SERVER=$1
+	IRC_PORT=$2
+
+	echo "	Bot: $IRC_SERVER $IRC_PORT"
+
+	$PYTHON_PATH $BOTCHECK_PATH/bot --debug --daemon --server=$IRC_SERVER --port=$IRC_PORT
+}
+
+start_all() {
+	IRC_SERVERS=`$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} 'SELECT host,port FROM servers WHERE covered="0"'`
+	BOT_COUNT=0
+
+	for CONN_LINE in ${IRC_SERVERS}; do
+		((BOT_COUNT++))
+	done
+
+	echo ""
+	echo "Starting $BOT_COUNT bots"
+
+	for CONN_LINE in ${IRC_SERVERS}; do
+		# The next couple lines may look confusing, see the following links
+		#	http://linuxgazette.net/issue18/bash.html
+		#	http://anton.lr2.com/archives/2006/04/10/bash-split-a-string-without-cut-or-awk/
+
+		# Trims the shortest match from the end
+		THE_SERVER=${CONN_LINE%|*}
+
+		# Trims the shortest match from the beginning
+		THE_PORT=${CONN_LINE#*|}
+
+		start_bot ${THE_SERVER} ${THE_PORT}
+	done
+
+	echo ""
+}
+
+stop_all() {
+	PIDS=`$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} 'SELECT pid FROM connections'`
+	BOT_COUNT=0
+
+	for CONN_LINE in ${PIDS}; do
+		((BOT_COUNT++))
+	done
+
+	if [ "$BOT_COUNT" == "0" ]; then
+		echo ""
+		echo "All bots stopped"
+		echo ""
+	else
+		echo ""
+		echo "Stopping $BOT_COUNT bots"
+
+		for THE_PID in ${PIDS}; do
+			stop_bot_by_pid ${THE_PID}
+		done
+		echo ""
+	fi
+}
+
+stop_bot() {
+	NICKNAME=$1
+	IRC_SERVER=$2
+
+	NICK_ID=`$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} 'SELECT nick_id FROM nicks WHERE nickname="$NICKNAME"'`
+	PIDS=`$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} 'SELECT pid FROM connections WHERE nick_id'`
+	BOT_COUNT=0
+
+	for CONN_LINE in ${IRC_SERVERS}; do
+		((BOT_COUNT++))
+	done
+
+	echo ""
+	echo "Stopping $BOT_COUNT bots"
+
+	for THE_PID in ${PIDS}; do
+		stop_bot_by_pid ${THE_PID}
+	done
+	
+	echo ""
+}
+
+stop_bot_by_pid() {
+	PID=$1
+
+	# Kills the python script that is running the bot
+	/usr/bin/kill -9 $1
+
+	# Delete the pid from the database
+	$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} "DELETE FROM connections WHERE pid=\"$PID\""
+}
+
+add_server() {
+	IRC_SERVER=$1
+	IRC_PORT=$2
+
+	$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} "INSERT INTO servers VALUES (NULL,\"$IRC_SERVER\",\"$IRC_PORT\",\"0\")"
+
+	echo ""
+	echo "Added server $IRC_SERVER:$IRC_PORT"
+	echo ""
+}
+
+add_bot() {
+	NICKNAME=$1
+
+	$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} "INSERT INTO nicks VALUES (NULL,\"$NICKNAME\")"
+
+	echo ""
+	echo "Added nickname $NICKNAME"
+	echo ""
+}
+
+count_exemptions() {
+	NICKNAME=$1
+	IRC_SERVER=$2
+
+	if [ "$NICKNAME" == "all" ] || [ "$IRC_SERVER" == "all" ]; then
+		EXEMPTION_COUNT=`$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} "SELECT * FROM exempt_users WHERE nickname=\"$NICKNAME\" AND server_id=\"all\"" | wc -l`
+	else
+		EXEMPTION_COUNT=`$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} "SELECT * FROM exempt_users WHERE nickname=\"$NICKNAME\" AND server_id=\"all\"" | wc -l`
+		if [ $EXEMPTION_COUNT -lt 1 ]; then
+			SERVER_ID=$(get_server_id $IRC_SERVER)
+			EXEMPTION_COUNT=`$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} "SELECT * FROM exempt_users WHERE nickname=\"$NICKNAME\" AND server_id=\"$SERVER_ID\"" | wc -l`
+		fi
+	fi
+
+	echo $EXEMPTION_COUNT
+}
+
+get_server_id() {
+	IRC_SERVER=$1
+
+	SERVER_ID=`$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} "SELECT server_id FROM servers WHERE host=\"$IRC_SERVER\""`
+
+	echo $SERVER_ID
+}
+
+add_exemption() {
+	NICKNAME=$1
+	IRC_SERVER=$2
+
+	EXEMPTION_COUNT=$(count_exemptions $NICKNAME $IRC_SERVER)
+
+	if [ $EXEMPTION_COUNT -lt 1 ]; then
+		SERVER_ID=$(get_server_id $IRC_SERVER)
+
+		if [ "$IRC_SERVER" == "all" ]; then
+			# Delete any previous exemptions and then add one blanket "all" exemption
+			$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} "DELETE FROM exempt_users WHERE nickname=\"$NICKNAME\""
+			$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} "INSERT INTO exempt_users VALUES (NULL,\"$NICKNAME\",\"$IRC_SERVER\")"
+		else
+			$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} "INSERT INTO exempt_users VALUES (NULL,\"$NICKNAME\",\"$SERVER_ID\")"
+		fi
+	else
+		echo ""
+		echo "Exemption already exists"
+		echo ""
+		exit 0
+	fi
+
+	if [ "$IRC_SERVER" == "all" ]; then
+		echo ""
+		echo "Exempted $NICKNAME from all servers"
+		echo ""
+	else
+		SERVER_COUNT=`$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} "SELECT server_id FROM servers WHERE host=\"$IRC_SERVER\"" | wc -l`
+
+		if [ $SERVER_COUNT -lt 1 ]; then
+			# Server not found, so add a default
+			# config for it to the servers list
+			add_server $IRC_SERVER $DEFAULT_IRC_PORT
+		fi
+
+		echo ""
+		echo "Exempted $NICKNAME from $IRC_SERVER"
+		echo ""
+	fi
+}
+
+remove_nick() {
+	NICKNAME=$1
+
+	$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} "DELETE FROM nicks WHERE nickname=\"$NICKNAME\""
+
+	echo ""
+	echo "Removed bot nickname $NICKNAME"
+	echo ""
+}
+
+remove_server() {
+	IRC_SERVER=$1
+
+	SERVER_COUNT=`$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} "SELECT * FROM servers WHERE host=\"$IRC_SERVER\"" | wc -l`
+
+	if [ $SERVER_COUNT -gt 0 ]; then
+		$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} "DELETE FROM servers WHERE host=\"$IRC_SERVER\""
+
+		echo ""
+		echo "Removed server $IRC_SERVER"
+		echo ""
+	else
+		echo ""
+		echo "Server was not found"
+		echo ""
+	fi
+}
+
+remove_exemption() {
+	NICKNAME=$1
+	IRC_SERVER=$2
+
+	if [ "$NICKNAME" == "all" ]; then
+		EXEMPTION_COUNT=$(count_exemptions $NICKNAME $IRC_SERVER)
+
+		if [ $EXEMPTION_COUNT -gt 0 ]; then
+			$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} "DELETE FROM exempt_users"
+
+			echo ""
+			if [ $EXEMPTION_COUNT -gt 1 ]; then
+				echo "Removed $EXEMPTION_COUNT exemptions"
+			else
+				echo "Removed $EXEMPTION_COUNT exemption"
+			fi
+			echo ""
+		else
+			echo ""
+			echo "No exemptions were found"
+			echo ""
+		fi
+	elif [ "$IRC_SERVER" == "all" ]; then
+		EXEMPTION_COUNT=$(count_exemptions $NICKNAME $IRC_SERVER)
+
+		if [ $EXEMPTION_COUNT -gt 0 ]; then
+			$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} "DELETE FROM exempt_users WHERE nickname=\"$NICKNAME\""
+			
+			echo ""
+			echo "Removed all exemptions"
+			echo ""
+		else
+			echo ""
+			echo "No exemptions were found"
+			echo ""
+		fi
+	else
+		SERVER_ID=`$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} "SELECT server_id FROM servers WHERE host=\"$IRC_SERVER\""`
+		EXEMPTION_COUNT=$(count_exemptions $NICKNAME $IRC_SERVER)
+
+		if [ $EXEMPTION_COUNT -gt 0 ]; then
+			$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} "DELETE FROM exempt_users WHERE nickname=\"$NICKNAME\" AND server_id=\"$SERVER_ID\""
+
+			echo ""
+			echo "Removed exemption for $NICKNAME from $IRC_SERVER"
+			echo ""
+		else
+			echo ""
+			echo "No exemptions were found"
+			echo ""
+		fi
+	fi
+}
+
+# See how we were called
+case "${BOTMASTER_START}" in
+	add)
+		case "$2" in
+			nick)
+				NICKNAME=$3
+
+				if [ "$NICKNAME" == "" ]; then
+					usage "add" "nick"
+				fi
+
+				add_bot $NICKNAME
+				;;
+			server)
+				IRC_SERVER=$3
+				IRC_PORT=$4
+
+				if [ "$IRC_SERVER" == "" ]; then
+					usage "add" "server"
+				fi
+
+				if [ "$IRC_PORT" == "" ]; then
+					IRC_PORT="6667"
+				fi
+
+				add_server $IRC_SERVER $IRC_PORT
+				;;
+			exemption)
+				NICKNAME=$3
+				IRC_SERVER=$4
+
+				if [ "$NICKNAME" == "" ]; then
+					usage "add" "exemption" "nick"
+				fi
+
+				if [ "$IRC_SERVER" == "" ]; then
+					usage "add" "exemption" "server"
+				fi
+				
+				add_exemption $NICKNAME $IRC_SERVER
+				;;
+			*)
+				usage "add" "main"
+				;;
+		esac
+		;;
+
+	clean)
+		case "$2" in
+			logs)
+				echo ""
+				echo "Removing all log files"
+				echo ""
+
+				rm log/botcheck* -f
+				;;
+			pyc)
+				echo ""
+				echo "Removing compiled python code"
+				echo ""
+
+				rm *.pyc -f
+				;;
+			database)
+				;;
+			*)
+				usage "clean"
+		esac
+		;;
+
+	remove)
+		case "$2" in
+			nick)
+				NICKNAME=$3
+
+				if [ "$NICKNAME" == "" ]; then
+					usage "remove" "nick"
+				else
+					remove_nick $NICKNAME
+				fi
+				;;
+			server)
+				IRC_SERVER=$3
+				IRC_PORT=$4
+
+				if [ "$IRC_SERVER" == "" ]; then
+					usage "remove" "server"
+				fi
+
+				remove_server $IRC_SERVER
+				;;
+			exemption)
+				NICKNAME=$3
+				IRC_SERVER=$4
+
+				if [ "$NICKNAME" == "" ]; then
+					usage "remove" "exemption"
+				fi
+
+				if [ "$IRC_SERVER" == "" ]; then
+					IRC_SERVER="all"
+				fi
+				
+				remove_exemption $NICKNAME $IRC_SERVER
+				;;
+			*)
+				usage "remove"
+				exit 0
+				;;
+		esac
+		;;
+
+	report)
+		echo ""
+		echo "Not yet implemented"
+		echo ""
+		;;
+
+	start)
+		IRC_SERVER=$2
+		SERVER_COUNT=`$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} "SELECT * FROM servers" | wc -l`
+		NICK_COUNT=`$SQLITE_PATH ${BOTCHECK_PATH}/${BOT_DB} "SELECT * FROM nicks" | wc -l`
+
+		# A server name must be supplied, or the keyword 'all'
+		if [ "$IRC_SERVER" == "" ]; then
+			usage "start"
+		fi
+
+		# If no servers exist, then none can be started
+		if [ $SERVER_COUNT -lt 1 ]; then
+			echo ""
+			echo "No servers exist in your database."
+			echo "Add servers with the botmaster command"
+			echo ""
+			echo "example:"
+			echo ""
+			echo "	botmaster add server irc.dal.net"
+			echo ""
+			exit 1
+		fi
+
+		# Likewise, if no nicks exist, then it's impossible
+		# to connect to a server
+		if [ $NICK_COUNT -lt 1 ]; then
+			echo ""
+			echo "No nicknames for bots exist in your database."
+			echo "Add nicknames with the botmaster command"
+			echo ""
+			echo "example:"
+			echo ""
+			echo "	botmaster add nick myN3wNick"
+			echo ""
+			exit 1
+		fi
+
+		if [ "$IRC_SERVER" == "all" ]; then
+			start_all
+		else
+			start_bot $IRC_SERVER
+		fi
+		;;
+
+	stop)
+		NICKNAME=$2
+		IRC_SERVER=$3
+
+		if [ "$NICKNAME" == "" ]; then
+			echo You must supply a bot nickname you want to stop
+			exit 1
+		fi
+
+		if [ "$IRC_SERVER" == "" ] && [ "$NICKNAME" != "all" ]; then
+			echo You must supply an IRC server that you want to
+			echo stop the bot on
+			exit 1
+		fi
+
+		if [ "$NICKNAME" == "all" ]; then
+			stop_all
+		elif ["$NICKNAME" != "" ] && [ "$IRC_SERVER" != "" ]; then
+			stop_bot $NICKNAME $IRC_SERVER
+		elif [ "$IRC_SERVER" == "" ]; then
+			exit 0
+		fi
+		;;
+	*)
+		usage main
+		exit 0
+		;;
+esac
+
+exit 0
