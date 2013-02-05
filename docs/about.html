@@ -1,0 +1,158 @@
+<html>
+<head>
+	<title>Q and A with botcheck</title>
+	<script src="http://www.google-analytics.com/urchin.js" type="text/javascript"></script>
+</head>
+<body>
+	<table>
+		<tr>
+			<td style='font-weight: bold;'>Q.</td>
+			<td style='font-weight: bold;'>
+				Why's it called botcheck?
+			</td>
+		</tr>
+		<tr>
+			<td style='vertical-align: top;'>A.</td>
+			<td>
+				For the same reason my vsftpd log parser is called 'bananas'; I couldnt
+		    		think of a better name
+			</td>
+		</tr>
+
+		<tr><td>&nbsp;</td></tr>
+
+		<tr>
+			<td style='font-weight: bold;'>Q.</td>
+			<td style='font-weight: bold;'>
+				What does it do?
+			</td>
+		</tr>
+		<tr>
+			<td style='vertical-align: top;'>A.</td>
+			<td>
+				It sits on IRC servers and does /who commands all day long. It writes
+				out the names of users and the channels they are in if it finds anyone
+				who matches the /who commands
+			</td>
+		</tr>
+
+		<tr><td>&nbsp;</td></tr>
+
+		<tr>
+			<td style='font-weight: bold;'>Q.</td>
+			<td style='font-weight: bold;'>
+				Does it generate false positives?
+			</td>
+		</tr>
+		<tr>
+			<td style='vertical-align: top;'>A.</td>
+			<td>
+				Yes if you dont specify the /who arguments correctly
+			</td>
+		</tr>
+
+		<tr><td>&nbsp;</td></tr>
+
+		<tr>
+			<td style='font-weight: bold;'>Q.</td>
+			<td style='font-weight: bold;'>
+				Why not just use snort and let it sniff IRC traffic to alert on it?
+			</td>
+		</tr>
+		<tr>
+			<td style='vertical-align: top;'>A.</td>
+			<td>
+				Because that's overkill for the job we needed done. Snort involves
+				a database server, and rules that need to be configured, and you need
+				to stick it on a SPAN port on your switch, or put it in some other
+				location that can see all your border traffic.
+				<p>
+				botcheck is stupidly simple to use. You tell it who it should look for,
+				you tell it the servers to look on, and you wait for it to send what it
+				has found to syslog
+			</td>
+		</tr>
+
+		<tr><td>&nbsp;</td></tr>
+
+		<tr>
+			<td style='font-weight: bold;'>Q.</td>
+			<td style='font-weight: bold;'>
+				What are the system requirements
+			</td>
+		</tr>
+		<tr>
+			<td style='vertical-align: top;'>A.</td>
+			<td>
+				I run it on Scientific Linux Fermi 4 (RHEL4) with Python 2.3.4.
+				It should work on any Linux distro though.
+			</td>
+		</tr>
+
+		<tr><td>&nbsp;</td></tr>
+
+		<tr>
+			<td style='font-weight: bold;'>Q.</td>
+			<td style='font-weight: bold;'>
+				How many IRC servers can it connect to?
+			</td>
+		</tr>
+		<tr>
+			<td style='vertical-align: top;'>A.</td>
+			<td>
+				Good question. How many forked processes can your system handle?
+			</td>
+		</tr>
+
+		<tr><td>&nbsp;</td></tr>
+
+		<tr>
+			<td style='font-weight: bold;'>Q.</td>
+			<td style='font-weight: bold;'>
+				What happens if you get bounced or disconnected or the server splits?
+			</td>
+		</tr>
+		<tr>
+			<td style='vertical-align: top;'>A.</td>
+			<td>
+				The library I use tells me that it handles disconnects for me.
+				It also handles PINGs for me and as far as I know, if I get
+				disconnected, the library will try to reconnect me.
+			</td>
+		</tr>
+
+		<tr><td>&nbsp;</td></tr>
+
+		<tr>
+			<td style='font-weight: bold;'>Q.</td>
+			<td style='font-weight: bold;'>
+				What other cool things can I do with it?
+			</td>
+		</tr>
+		<tr>
+			<td style='vertical-align: top;'>A.</td>
+			<td>
+				Some cool things I do with it are catch the commands that
+				are sent to the bot. This makes for some interested logs
+				since people try to run commands on it, have conversations
+				with it, DCC files to it, or spam it :-)
+				<p>
+				Another cool thing that one can do, now or in the future,
+				is send all that extra stuff to a sqlite database and create
+				metrics with it. Metrics make people happy.
+				<p>
+				It supports a whitelist so you can tell it to not flag certain
+				users.
+				<p>
+				You can (and should) specify different nicks for each server
+				you connect to. None of those nicks will show up in the bots
+				logs though.
+			</td>
+		</tr>
+	</table>
+	<script type="text/javascript">
+		_uacct = "UA-88726-8";
+		urchinTracker();
+	</script>
+</body>
+</html>
